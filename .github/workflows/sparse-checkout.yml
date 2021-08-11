@@ -9,6 +9,7 @@ jobs:
       - uses: snow-actions/sparse-checkout@v1.1.0
         with:
           patterns: |
-            build/*
+            0-bootstrap
+            
       - name: check what was checkout
-        run: ls -al ${GITHUB_WORKSPACE}
+        run: ls -al
