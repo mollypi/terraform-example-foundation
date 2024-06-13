@@ -29,11 +29,6 @@ variable "billing_account" {
   type        = string
 }
 
-variable "impersonate_service_account" {
-  description = "Service account email of the account to impersonate to run Terraform"
-  type        = string
-}
-
 variable "project_suffix" {
   description = "The name of the GCP project. Max 16 characters with 3 character business unit code."
   type        = string
@@ -63,7 +58,7 @@ variable "secondary_contact" {
 variable "business_code" {
   description = "The code that describes which business unit owns the project"
   type        = string
-  default     = "abcd"
+  default     = "shared"
 }
 
 variable "activate_apis" {
@@ -77,10 +72,27 @@ variable "environment" {
   type        = string
 }
 
-variable "vpc_type" {
-  description = "The type of VPC to attach the project to. Possible options are base or restricted."
+variable "vpc" {
+  description = "The type of VPC to attach the project to. Possible options are none, base, or restricted."
+  type        = string
+  default     = "none"
+
+  validation {
+    condition     = contains(["none", "base", "restricted"], var.vpc)
+    error_message = "For vpc, only `none`, `base`, or `restricted` are valid."
+  }
+}
+
+variable "shared_vpc_host_project_id" {
+  description = "Shared VPC host project ID"
   type        = string
   default     = ""
+}
+
+variable "shared_vpc_subnets" {
+  description = "List of the shared vpc subnets self links."
+  type        = list(string)
+  default     = []
 }
 
 variable "vpc_service_control_attach_enabled" {
@@ -95,22 +107,27 @@ variable "vpc_service_control_perimeter_name" {
   default     = null
 }
 
-variable "alert_spent_percents" {
-  description = "A list of percentages of the budget to alert on when threshold is exceeded"
-  type        = list(number)
-  default     = [0.5, 0.75, 0.9, 0.95]
-}
-
-variable "alert_pubsub_topic" {
-  description = "The name of the Cloud Pub/Sub topic where budget related messages will be published, in the form of `projects/{project_id}/topics/{topic_id}`"
+variable "vpc_service_control_sleep_duration" {
+  description = "The duration to sleep in seconds before adding the project to a shared VPC after the project is added to the VPC Service Control Perimeter"
   type        = string
-  default     = null
+  default     = "5s"
 }
 
-variable "budget_amount" {
-  description = "The amount to use as the budget"
-  type        = number
-  default     = 1000
+variable "project_budget" {
+  description = <<EOT
+  Budget configuration.
+  budget_amount: The amount to use as the budget.
+  alert_spent_percents: A list of percentages of the budget to alert on when threshold is exceeded.
+  alert_pubsub_topic: The name of the Cloud Pub/Sub topic where budget related messages will be published, in the form of `projects/{project_id}/topics/{topic_id}`.
+  alert_spend_basis: The type of basis used to determine if spend has passed the threshold. Possible choices are `CURRENT_SPEND` or `FORECASTED_SPEND` (default).
+  EOT
+  type = object({
+    budget_amount        = optional(number, 1000)
+    alert_spent_percents = optional(list(number), [1.2])
+    alert_pubsub_topic   = optional(string, null)
+    alert_spend_basis    = optional(string, "FORECASTED_SPEND")
+  })
+  default = {}
 }
 
 variable "project_prefix" {
@@ -119,26 +136,20 @@ variable "project_prefix" {
   default     = "prj"
 }
 
-variable "enable_hub_and_spoke" {
-  description = "Enable Hub-and-Spoke architecture."
-  type        = bool
-  default     = false
+variable "app_infra_pipeline_service_accounts" {
+  description = "The Service Accounts from App Infra Pipeline."
+  type        = map(string)
+  default     = {}
 }
 
 variable "sa_roles" {
-  description = "A list of roles to give the Service Account for the project (defaults to none)"
-  type        = list(string)
-  default     = []
+  description = "A list of roles to give the Service Account from App Infra Pipeline."
+  type        = map(list(string))
+  default     = {}
 }
 
 variable "enable_cloudbuild_deploy" {
   description = "Enable infra deployment using Cloud Build"
   type        = bool
   default     = false
-}
-
-variable "cloudbuild_sa" {
-  description = "The Cloud Build SA used for deploying infrastructure in this project. It will impersonate the new default SA created"
-  type        = string
-  default     = ""
 }

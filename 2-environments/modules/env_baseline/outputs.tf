@@ -19,22 +19,23 @@ output "env_folder" {
   value       = google_folder.env.name
 }
 
-output "monitoring_project_id" {
-  description = "Project for monitoring infra."
-  value       = module.monitoring_project.project_id
-}
-
-output "base_shared_vpc_project_id" {
-  description = "Project for base shared VPC network."
-  value       = module.base_shared_vpc_host_project.project_id
-}
-
-output "restricted_shared_vpc_project_id" {
-  description = "Project for restricted shared VPC network."
-  value       = module.restricted_shared_vpc_host_project.project_id
-}
-
 output "env_secrets_project_id" {
   description = "Project for environment secrets."
   value       = module.env_secrets.project_id
+}
+
+output "env_kms_project_id" {
+  description = "Project for environment Cloud Key Management Service (KMS)."
+  value       = module.env_kms.project_id
+}
+
+
+output "assured_workload_id" {
+  description = "Assured Workload ID."
+  value       = var.assured_workload_configuration.enabled ? google_assured_workloads_workload.workload[0].id : ""
+}
+
+output "assured_workload_resources" {
+  description = "Resources associated with the Assured Workload."
+  value       = var.assured_workload_configuration.enabled ? google_assured_workloads_workload.workload[0].resources : []
 }

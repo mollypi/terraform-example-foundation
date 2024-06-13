@@ -18,17 +18,32 @@ terraform {
   required_version = ">= 0.13"
   required_providers {
     google = {
+      // version 4.31.0 removed because of issue https://github.com/hashicorp/terraform-provider-google/issues/12226
       source  = "hashicorp/google"
-      version = ">= 3.50"
-    }
-    null = {
-      source  = "hashicorp/null"
-      version = "~> 2.1"
+      version = ">= 3.50, != 4.31.0"
     }
 
-    random = {
-      source  = "hashicorp/random"
-      version = "~> 2.3"
-    }
+    // Un-comment gitlab required_providers when using gitlab CI/CD
+    # gitlab = {
+    #   source  = "gitlabhq/gitlab"
+    #   version = "16.6.0"
+    # }
+
+    // Un-comment github required_providers when using GitHub Actions
+    # github = {
+    #   source  = "integrations/github"
+    #   version = "5.34.0"
+    # }
+
+    // Un-comment tfe required_providers when using Terraform Cloud
+    # tfe = {
+    #   source  = "hashicorp/tfe"
+    #   version = "0.48.0"
+    # }
   }
+
+  provider_meta "google" {
+    module_name = "blueprints/terraform/terraform-example-foundation:bootstrap/v4.0.0"
+  }
+
 }

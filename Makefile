@@ -18,7 +18,7 @@
 # Make will use bash instead of sh
 SHELL := /usr/bin/env bash
 
-DOCKER_TAG_VERSION_DEVELOPER_TOOLS := 0.13
+DOCKER_TAG_VERSION_DEVELOPER_TOOLS := 1.21
 DOCKER_IMAGE_DEVELOPER_TOOLS := cft/developer-tools
 REGISTRY_URL := gcr.io/cloud-foundation-cicd
 
@@ -27,6 +27,7 @@ REGISTRY_URL := gcr.io/cloud-foundation-cicd
 docker_test_lint:
 	docker run --rm -it \
 		-e ENABLE_PARALLEL=1 \
+		-e DISABLE_TFLINT=1 \
 		-e EXCLUDE_LINT_DIRS \
 		-v $(CURDIR):/workspace \
 		$(REGISTRY_URL)/${DOCKER_IMAGE_DEVELOPER_TOOLS}:${DOCKER_TAG_VERSION_DEVELOPER_TOOLS} \
@@ -54,6 +55,7 @@ docker_run:
 		-e TF_VAR_billing_account \
 		-e TF_VAR_group_email \
 		-e TF_VAR_domain_to_allow \
+		-e TF_VAR_example_foundations_mode \
 		-v "$(CURDIR)":/workspace \
 		$(REGISTRY_URL)/${DOCKER_IMAGE_DEVELOPER_TOOLS}:${DOCKER_TAG_VERSION_DEVELOPER_TOOLS} \
 		/bin/bash
@@ -67,6 +69,8 @@ docker_test_prepare:
 		-e TF_VAR_folder_id \
 		-e TF_VAR_billing_account \
 		-e TF_VAR_group_email \
+		-e TF_VAR_domain_to_allow \
+		-e TF_VAR_example_foundations_mode \
 		-v "$(CURDIR)":/workspace \
 		$(REGISTRY_URL)/${DOCKER_IMAGE_DEVELOPER_TOOLS}:${DOCKER_TAG_VERSION_DEVELOPER_TOOLS} \
 		/usr/local/bin/execute_with_credentials.sh prepare_environment
@@ -79,6 +83,9 @@ docker_test_cleanup:
 		-e TF_VAR_org_id \
 		-e TF_VAR_folder_id \
 		-e TF_VAR_billing_account \
+		-e TF_VAR_group_email \
+		-e TF_VAR_domain_to_allow \
+		-e TF_VAR_example_foundations_mode \
 		-v "$(CURDIR)":/workspace \
 		$(REGISTRY_URL)/${DOCKER_IMAGE_DEVELOPER_TOOLS}:${DOCKER_TAG_VERSION_DEVELOPER_TOOLS} \
 		/usr/local/bin/execute_with_credentials.sh cleanup_environment

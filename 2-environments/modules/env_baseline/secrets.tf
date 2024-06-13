@@ -20,16 +20,18 @@
 *****************************************/
 
 module "env_secrets" {
-  source                      = "terraform-google-modules/project-factory/google"
-  version                     = "~> 10.1"
-  random_project_id           = "true"
-  impersonate_service_account = var.terraform_service_account
+  source  = "terraform-google-modules/project-factory/google"
+  version = "~> 15.0"
+
+  random_project_id           = true
+  random_project_id_length    = 4
   default_service_account     = "deprivilege"
-  name                        = "${var.project_prefix}-${var.environment_code}-secrets"
-  org_id                      = var.org_id
-  billing_account             = var.billing_account
+  name                        = "${local.project_prefix}-${var.environment_code}-secrets"
+  org_id                      = local.org_id
+  billing_account             = local.billing_account
   folder_id                   = google_folder.env.id
   disable_services_on_destroy = false
+  depends_on                  = [time_sleep.wait_60_seconds]
   activate_apis               = ["logging.googleapis.com", "secretmanager.googleapis.com"]
 
   labels = {
@@ -38,10 +40,12 @@ module "env_secrets" {
     billing_code      = "1234"
     primary_contact   = "example1"
     secondary_contact = "example2"
-    business_code     = "abcd"
+    business_code     = "shared"
     env_code          = var.environment_code
+    vpc               = "none"
   }
-  budget_alert_pubsub_topic   = var.secret_project_alert_pubsub_topic
-  budget_alert_spent_percents = var.secret_project_alert_spent_percents
-  budget_amount               = var.secret_project_budget_amount
+  budget_alert_pubsub_topic   = var.project_budget.secret_alert_pubsub_topic
+  budget_alert_spent_percents = var.project_budget.secret_alert_spent_percents
+  budget_amount               = var.project_budget.secret_budget_amount
+  budget_alert_spend_basis    = var.project_budget.secret_budget_alert_spend_basis
 }

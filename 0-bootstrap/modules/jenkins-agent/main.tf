@@ -18,7 +18,6 @@ locals {
   cicd_project_name           = format("%s-%s", var.project_prefix, "b-cicd")
   impersonation_enabled_count = var.sa_enable_impersonation ? 1 : 0
   activate_apis               = distinct(concat(var.activate_apis, ["billingbudgets.googleapis.com"]))
-  jenkins_gce_fw_tags         = ["ssh-jenkins-agent"]
 }
 
 resource "random_id" "suffix" {
@@ -29,10 +28,12 @@ resource "random_id" "suffix" {
   CICD project
 *******************************************/
 module "cicd_project" {
-  source                      = "terraform-google-modules/project-factory/google"
-  version                     = "~> 10.0"
+  source  = "terraform-google-modules/project-factory/google"
+  version = "~> 15.0"
+
   name                        = local.cicd_project_name
   random_project_id           = true
+  random_project_id_length    = 4
   disable_services_on_destroy = false
   folder_id                   = var.folder_id
   org_id                      = var.org_id
@@ -45,9 +46,10 @@ module "cicd_project" {
   Jenkins Agent GCE instance
 *******************************************/
 resource "google_service_account" "jenkins_agent_gce_sa" {
-  project      = module.cicd_project.project_id
-  account_id   = format("%s-%s", var.service_account_prefix, var.jenkins_agent_sa_email)
-  display_name = "Jenkins Agent (GCE instance) custom Service Account"
+  project                      = module.cicd_project.project_id
+  account_id                   = format("%s-%s", var.service_account_prefix, var.jenkins_agent_sa_email)
+  display_name                 = "Jenkins Agent (GCE instance) custom Service Account"
+  create_ignore_already_exists = true
 }
 
 data "template_file" "jenkins_agent_gce_startup_script" {
@@ -68,12 +70,17 @@ resource "google_compute_instance" "jenkins_agent_gce_instance" {
   machine_type = var.jenkins_agent_gce_machine_type
   zone         = "${var.default_region}-a"
 
-  tags = local.jenkins_gce_fw_tags
+  params {
+    resource_manager_tags = {
+      "tagKeys/${google_tags_tag_key.jenkins_agents.name}" = "tagValues/${google_tags_tag_value.jenkins_agents.name}"
+    }
+  }
 
   boot_disk {
     initialize_params {
       // It is better if user has a golden image with all necessary packages.
-      image = "debian-cloud/debian-9"
+      image = "debian-cloud/debian-11"
+      size  = 20
     }
   }
 
@@ -83,10 +90,9 @@ resource "google_compute_instance" "jenkins_agent_gce_instance" {
     network_ip = google_compute_address.jenkins_agent_gce_static_ip.address
   }
 
-  // Adding ssh public keys to the GCE instance metadata, so the Jenkins Master can connect to this Agent
+  // Adding ssh public keys to the GCE instance metadata, so the Jenkins Controller can connect to this Agent
   metadata = {
-    enable-oslogin = "false"
-    ssh-keys       = var.jenkins_agent_gce_ssh_pub_key
+    ssh-keys = var.jenkins_agent_gce_ssh_pub_key
   }
 
   metadata_startup_script = data.template_file.jenkins_agent_gce_startup_script.rendered
@@ -103,26 +109,52 @@ resource "google_compute_instance" "jenkins_agent_gce_instance" {
 }
 
 /******************************************
-  Jenkins Agent GCE Network and Firewall rules
+  Jenkins Agent GCE Network, Resource Manager Tags and Firewall rules
 *******************************************/
-
-resource "google_compute_firewall" "fw_allow_ssh_into_jenkins_agent" {
-  project       = module.cicd_project.project_id
-  name          = "fw-${google_compute_network.jenkins_agents.name}-1000-i-a-all-all-tcp-22"
-  description   = "Allow the Jenkins Master (Client) to connect to the Jenkins Agents (Servers) using SSH."
-  network       = google_compute_network.jenkins_agents.name
-  source_ranges = var.jenkins_master_subnetwork_cidr_range
-  target_tags   = local.jenkins_gce_fw_tags
-  priority      = 1000
-
-  log_config {
-    metadata = "INCLUDE_ALL_METADATA"
+resource "google_tags_tag_key" "jenkins_agents" {
+  description = "Tag Key to control the connection between Jenkins Controller (Client) and the Jenkins Agents (Servers) using SSH."
+  parent      = "organizations/${var.org_id}"
+  purpose     = "GCE_FIREWALL"
+  short_name  = "ssh-jenkins-agent"
+  purpose_data = {
+    network = "${module.cicd_project.project_id}/${google_compute_network.jenkins_agents.name}"
   }
+}
 
-  allow {
-    protocol = "tcp"
-    ports    = ["22"]
-  }
+resource "google_tags_tag_value" "jenkins_agents" {
+  description = "Allow the connection."
+  parent      = "tagKeys/${google_tags_tag_key.jenkins_agents.name}"
+  short_name  = "allow"
+}
+
+module "jenkins_firewall_rules" {
+  source      = "terraform-google-modules/network/google//modules/network-firewall-policy"
+  version     = "~> 9.0"
+  project_id  = module.cicd_project.project_id
+  policy_name = "fp-${google_compute_network.jenkins_agents.name}-jenkins-firewall"
+  description = "Jenkins Agent GCE network firewall rules."
+  target_vpcs = [google_compute_network.jenkins_agents.id]
+
+  rules = [
+    {
+      priority           = "1000"
+      direction          = "INGRESS"
+      action             = "allow"
+      rule_name          = "fw-${google_compute_network.jenkins_agents.name}-1000-i-a-all-all-tcp-22"
+      description        = "Allow the Jenkins Controller (Client) to connect to the Jenkins Agents (Servers) using SSH."
+      enable_logging     = true
+      target_secure_tags = ["tagValues/${google_tags_tag_value.jenkins_agents.name}"]
+      match = {
+        src_ip_ranges = var.jenkins_controller_subnetwork_cidr_range
+        layer4_configs = [
+          {
+            ip_protocol = "tcp"
+            ports       = ["22"]
+          },
+        ]
+      }
+    }
+  ]
 }
 
 resource "google_compute_network" "jenkins_agents" {
@@ -136,6 +168,24 @@ resource "google_compute_subnetwork" "jenkins_agents_subnet" {
   ip_cidr_range = var.jenkins_agent_gce_subnetwork_cidr_range
   region        = var.default_region
   network       = google_compute_network.jenkins_agents.self_link
+
+  log_config {
+    aggregation_interval = "INTERVAL_5_SEC"
+    flow_sampling        = 0.5
+    metadata             = "INCLUDE_ALL_METADATA"
+    metadata_fields      = null
+    filter_expr          = true
+  }
+}
+
+resource "google_dns_policy" "default_policy" {
+  project                   = module.cicd_project.project_id
+  name                      = "dp-b-jenkinsagents-default-policy"
+  enable_inbound_forwarding = true
+  enable_logging            = true
+  networks {
+    network_url = google_compute_network.jenkins_agents.self_link
+  }
 }
 
 resource "google_compute_address" "jenkins_agent_gce_static_ip" {
@@ -187,7 +237,7 @@ resource "google_compute_router_nat" "nat_external_addresses_region1" {
 }
 
 /******************************************
-  VPN Connectivity Master on-prem <--> CICD project
+  VPN Connectivity Controller on-prem <--> CICD project
 *******************************************/
 
 // Please add VPN connectivity manually: see README > Requirements
@@ -237,9 +287,9 @@ resource "google_storage_bucket_iam_member" "jenkins_artifacts_iam" {
 
 // Allow the Jenkins Agent (GCE Instance) custom Service Account to impersonate the Terraform Service Account
 resource "google_service_account_iam_member" "jenkins_terraform_sa_impersonate_permissions" {
-  count = local.impersonation_enabled_count
+  for_each = var.sa_enable_impersonation ? var.terraform_sa_names : {}
 
-  service_account_id = var.terraform_sa_name
+  service_account_id = each.value
   role               = "roles/iam.serviceAccountTokenCreator"
   member             = "serviceAccount:${google_service_account.jenkins_agent_gce_sa.email}"
 }

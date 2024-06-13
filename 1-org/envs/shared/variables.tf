@@ -14,57 +14,15 @@
  * limitations under the License.
  */
 
-variable "org_id" {
-  description = "The organization id for the associated services"
-  type        = string
-}
-
-variable "billing_account" {
-  description = "The ID of the billing account to associate this project with"
-  type        = string
-}
-
-variable "terraform_service_account" {
-  description = "Service account email of the account to impersonate to run Terraform."
-  type        = string
-}
-
-variable "default_region" {
-  description = "Default region for BigQuery resources."
-  type        = string
-}
-
 variable "enable_hub_and_spoke" {
   description = "Enable Hub-and-Spoke architecture."
   type        = bool
   default     = false
 }
 
-variable "billing_data_users" {
-  description = "Google Workspace or Cloud Identity group that have access to billing data set."
-  type        = string
-}
-
-variable "audit_data_users" {
-  description = "Google Workspace or Cloud Identity group that have access to audit logs."
-  type        = string
-}
-
 variable "domains_to_allow" {
-  description = "The list of domains to allow users from in IAM. Used by Domain Restricted Sharing Organization Policy. Must include the domain of the organization you are deploying the foundation. To add other domains you must also grant access to these domains to the terraform service account used in the deploy."
+  description = "The list of domains to allow users from in IAM. Used by Domain Restricted Sharing Organization Policy. Must include the domain of the organization you are deploying the foundation. To add other domains you must also grant access to these domains to the Terraform Service Account used in the deploy."
   type        = list(string)
-}
-
-variable "enable_os_login_policy" {
-  description = "Enable OS Login Organization Policy."
-  type        = bool
-  default     = false
-}
-
-variable "audit_logs_table_expiration_days" {
-  description = "Period before tables expire for all audit logs in milliseconds. Default is 30 days."
-  type        = number
-  default     = 30
 }
 
 variable "scc_notification_name" {
@@ -72,8 +30,8 @@ variable "scc_notification_name" {
   type        = string
 }
 
-variable "skip_gcloud_download" {
-  description = "Whether to skip downloading gcloud (assumes gcloud is already available outside the module. If set to true you, must ensure that Gcloud Alpha module is installed.)"
+variable "create_access_context_manager_access_policy" {
+  description = "Whether to create access context manager access policy."
   type        = bool
   default     = true
 }
@@ -81,31 +39,31 @@ variable "skip_gcloud_download" {
 variable "scc_notification_filter" {
   description = "Filter used to create the Security Command Center Notification, you can see more details on how to create filters in https://cloud.google.com/security-command-center/docs/how-to-api-filter-notifications#create-filter"
   type        = string
-  default     = "state=\\\"ACTIVE\\\""
+  default     = "state = \"ACTIVE\""
 }
 
-variable "parent_folder" {
-  description = "Optional - for an organization with existing projects or for development/validation. It will place all the example foundation resources under the provided folder instead of the root organization. The value is the numeric folder ID. The folder must already exist. Must be the same value used in previous step."
-  type        = string
-  default     = ""
-}
-
-variable "create_access_context_manager_access_policy" {
-  description = "Whether to create access context manager access policy"
+variable "enforce_allowed_worker_pools" {
+  description = "Whether to enforce the organization policy restriction on allowed worker pools for Cloud Build."
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "data_access_logs_enabled" {
-  description = "Enable Data Access logs of types DATA_READ, DATA_WRITE and ADMIN_READ for all GCP services. Enabling Data Access logs might result in your organization being charged for the additional logs usage. See https://cloud.google.com/logging/docs/audit#data-access"
+  description = "Enable Data Access logs of types DATA_READ, DATA_WRITE for all GCP services. Enabling Data Access logs might result in your organization being charged for the additional logs usage. See https://cloud.google.com/logging/docs/audit#data-access The ADMIN_READ logs are enabled by default."
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "log_export_storage_location" {
   description = "The location of the storage bucket used to export logs."
   type        = string
-  default     = "US"
+  default     = null
+}
+
+variable "billing_export_dataset_location" {
+  description = "The location of the dataset for billing data export."
+  type        = string
+  default     = null
 }
 
 variable "log_export_storage_force_destroy" {
@@ -120,12 +78,6 @@ variable "log_export_storage_versioning" {
   default     = false
 }
 
-variable "audit_logs_table_delete_contents_on_destroy" {
-  description = "(Optional) If set to true, delete all the tables in the dataset when destroying the resource; otherwise, destroying the resource will fail if tables are present."
-  type        = bool
-  default     = false
-}
-
 variable "log_export_storage_retention_policy" {
   description = "Configuration of the bucket's data retention policy for how long objects in the bucket should be retained."
   type = object({
@@ -135,159 +87,114 @@ variable "log_export_storage_retention_policy" {
   default = null
 }
 
-variable "dns_hub_project_alert_spent_percents" {
-  description = "A list of percentages of the budget to alert on when threshold is exceeded for the DNS hub project."
-  type        = list(number)
-  default     = [0.5, 0.75, 0.9, 0.95]
+
+variable "project_budget" {
+  description = <<EOT
+  Budget configuration for projects.
+  budget_amount: The amount to use as the budget.
+  alert_spent_percents: A list of percentages of the budget to alert on when threshold is exceeded.
+  alert_pubsub_topic: The name of the Cloud Pub/Sub topic where budget related messages will be published, in the form of `projects/{project_id}/topics/{topic_id}`.
+  alert_spend_basis: The type of basis used to determine if spend has passed the threshold. Possible choices are `CURRENT_SPEND` or `FORECASTED_SPEND` (default).
+  EOT
+  type = object({
+    dns_hub_budget_amount                       = optional(number, 1000)
+    dns_hub_alert_spent_percents                = optional(list(number), [1.2])
+    dns_hub_alert_pubsub_topic                  = optional(string, null)
+    dns_hub_budget_alert_spend_basis            = optional(string, "FORECASTED_SPEND")
+    base_net_hub_budget_amount                  = optional(number, 1000)
+    base_net_hub_alert_spent_percents           = optional(list(number), [1.2])
+    base_net_hub_alert_pubsub_topic             = optional(string, null)
+    base_net_hub_budget_alert_spend_basis       = optional(string, "FORECASTED_SPEND")
+    base_network_budget_amount                  = optional(number, 1000)
+    base_network_alert_spent_percents           = optional(list(number), [1.2])
+    base_network_alert_pubsub_topic             = optional(string, null)
+    base_network_budget_alert_spend_basis       = optional(string, "FORECASTED_SPEND")
+    restricted_net_hub_budget_amount            = optional(number, 1000)
+    restricted_net_hub_alert_spent_percents     = optional(list(number), [1.2])
+    restricted_net_hub_alert_pubsub_topic       = optional(string, null)
+    restricted_net_hub_budget_alert_spend_basis = optional(string, "FORECASTED_SPEND")
+    restricted_network_budget_amount            = optional(number, 1000)
+    restricted_network_alert_spent_percents     = optional(list(number), [1.2])
+    restricted_network_alert_pubsub_topic       = optional(string, null)
+    restricted_network_budget_alert_spend_basis = optional(string, "FORECASTED_SPEND")
+    interconnect_budget_amount                  = optional(number, 1000)
+    interconnect_alert_spent_percents           = optional(list(number), [1.2])
+    interconnect_alert_pubsub_topic             = optional(string, null)
+    interconnect_budget_alert_spend_basis       = optional(string, "FORECASTED_SPEND")
+    org_secrets_budget_amount                   = optional(number, 1000)
+    org_secrets_alert_spent_percents            = optional(list(number), [1.2])
+    org_secrets_alert_pubsub_topic              = optional(string, null)
+    org_secrets_budget_alert_spend_basis        = optional(string, "FORECASTED_SPEND")
+    org_billing_export_budget_amount            = optional(number, 1000)
+    org_billing_export_alert_spent_percents     = optional(list(number), [1.2])
+    org_billing_export_alert_pubsub_topic       = optional(string, null)
+    org_billing_export_budget_alert_spend_basis = optional(string, "FORECASTED_SPEND")
+    org_audit_logs_budget_amount                = optional(number, 1000)
+    org_audit_logs_alert_spent_percents         = optional(list(number), [1.2])
+    org_audit_logs_alert_pubsub_topic           = optional(string, null)
+    org_audit_logs_budget_alert_spend_basis     = optional(string, "FORECASTED_SPEND")
+    org_kms_budget_amount                       = optional(number, 1000)
+    org_kms_alert_spent_percents                = optional(list(number), [1.2])
+    org_kms_alert_pubsub_topic                  = optional(string, null)
+    org_kms_budget_alert_spend_basis            = optional(string, "FORECASTED_SPEND")
+    scc_notifications_budget_amount             = optional(number, 1000)
+    scc_notifications_alert_spent_percents      = optional(list(number), [1.2])
+    scc_notifications_alert_pubsub_topic        = optional(string, null)
+    scc_notifications_budget_alert_spend_basis  = optional(string, "FORECASTED_SPEND")
+  })
+  default = {}
 }
 
-variable "dns_hub_project_alert_pubsub_topic" {
-  description = "The name of the Cloud Pub/Sub topic where budget related messages will be published, in the form of `projects/{project_id}/topics/{topic_id}` for the DNS hub project."
+variable "gcp_groups" {
+  description = <<EOT
+  Groups to grant specific roles in the Organization.
+  platform_viewer: Google Workspace or Cloud Identity group that have the ability to view resource information across the Google Cloud organization.
+  security_reviewer: Google Workspace or Cloud Identity group that members are part of the security team responsible for reviewing cloud security
+  network_viewer: Google Workspace or Cloud Identity group that members are part of the networking team and review network configurations.
+  scc_admin: Google Workspace or Cloud Identity group that can administer Security Command Center.
+  audit_viewer: Google Workspace or Cloud Identity group that members are part of an audit team and view audit logs in the logging project.
+  global_secrets_admin: Google Workspace or Cloud Identity group that members are responsible for putting secrets into Secrets Manage
+  EOT
+  type = object({
+    audit_viewer         = optional(string, null)
+    security_reviewer    = optional(string, null)
+    network_viewer       = optional(string, null)
+    scc_admin            = optional(string, null)
+    global_secrets_admin = optional(string, null)
+    kms_admin            = optional(string, null)
+  })
+  default = {}
+}
+
+variable "essential_contacts_language" {
+  description = "Essential Contacts preferred language for notifications, as a ISO 639-1 language code. See [Supported languages](https://cloud.google.com/resource-manager/docs/managing-notification-contacts#supported-languages) for a list of supported languages."
   type        = string
-  default     = null
+  default     = "en"
 }
 
-variable "dns_hub_project_budget_amount" {
-  description = "The amount to use as the budget for the DNS hub project."
-  type        = number
-  default     = 1000
-}
-
-variable "base_net_hub_project_alert_spent_percents" {
-  description = "A list of percentages of the budget to alert on when threshold is exceeded for the base net hub project."
-  type        = list(number)
-  default     = [0.5, 0.75, 0.9, 0.95]
-}
-
-variable "base_net_hub_project_alert_pubsub_topic" {
-  description = "The name of the Cloud Pub/Sub topic where budget related messages will be published, in the form of `projects/{project_id}/topics/{topic_id}` for the base net hub project."
+variable "remote_state_bucket" {
+  description = "Backend bucket to load Terraform Remote State Data from previous steps."
   type        = string
-  default     = null
 }
 
-variable "base_net_hub_project_budget_amount" {
-  description = "The amount to use as the budget for the base net hub project."
-  type        = number
-  default     = 1000
+variable "essential_contacts_domains_to_allow" {
+  description = "The list of domains that email addresses added to Essential Contacts can have."
+  type        = list(string)
 }
 
-variable "restricted_net_hub_project_alert_spent_percents" {
-  description = "A list of percentages of the budget to alert on when threshold is exceeded for the restricted net hub project."
-  type        = list(number)
-  default     = [0.5, 0.75, 0.9, 0.95]
+variable "create_unique_tag_key" {
+  description = "Creates unique organization-wide tag keys by adding a random suffix to each key."
+  type        = bool
+  default     = false
+}
+variable "cai_monitoring_kms_force_destroy" {
+  description = "If set to true, delete KMS keyring and keys when destroying the module; otherwise, destroying the module will fail if KMS keys are present."
+  type        = bool
+  default     = false
 }
 
-variable "restricted_net_hub_project_alert_pubsub_topic" {
-  description = "The name of the Cloud Pub/Sub topic where budget related messages will be published, in the form of `projects/{project_id}/topics/{topic_id}` for the restricted net hub project."
+variable "tfc_org_name" {
+  description = "Name of the TFC organization"
   type        = string
-  default     = null
-}
-
-variable "restricted_net_hub_project_budget_amount" {
-  description = "The amount to use as the budget for the restricted net hub project."
-  type        = number
-  default     = 1000
-}
-
-variable "interconnect_project_alert_spent_percents" {
-  description = "A list of percentages of the budget to alert on when threshold is exceeded for the Dedicated Interconnect project."
-  type        = list(number)
-  default     = [0.5, 0.75, 0.9, 0.95]
-}
-
-variable "interconnect_project_alert_pubsub_topic" {
-  description = "The name of the Cloud Pub/Sub topic where budget related messages will be published, in the form of `projects/{project_id}/topics/{topic_id}` for the Dedicated Interconnect project."
-  type        = string
-  default     = null
-}
-
-variable "interconnect_project_budget_amount" {
-  description = "The amount to use as the budget for the Dedicated Interconnect project."
-  type        = number
-  default     = 1000
-}
-
-variable "org_secrets_project_alert_spent_percents" {
-  description = "A list of percentages of the budget to alert on when threshold is exceeded for the org secrets project."
-  type        = list(number)
-  default     = [0.5, 0.75, 0.9, 0.95]
-}
-
-variable "org_secrets_project_alert_pubsub_topic" {
-  description = "The name of the Cloud Pub/Sub topic where budget related messages will be published, in the form of `projects/{project_id}/topics/{topic_id}` for the org secrets project."
-  type        = string
-  default     = null
-}
-
-variable "org_secrets_project_budget_amount" {
-  description = "The amount to use as the budget for the org secrets project."
-  type        = number
-  default     = 1000
-}
-
-
-variable "org_billing_logs_project_alert_spent_percents" {
-  description = "A list of percentages of the budget to alert on when threshold is exceeded for the org billing logs project."
-  type        = list(number)
-  default     = [0.5, 0.75, 0.9, 0.95]
-}
-
-variable "org_billing_logs_project_alert_pubsub_topic" {
-  description = "The name of the Cloud Pub/Sub topic where budget related messages will be published, in the form of `projects/{project_id}/topics/{topic_id}` for the org billing logs project."
-  type        = string
-  default     = null
-}
-
-variable "org_billing_logs_project_budget_amount" {
-  description = "The amount to use as the budget for the org billing logs project."
-  type        = number
-  default     = 1000
-}
-
-variable "org_audit_logs_project_alert_spent_percents" {
-  description = "A list of percentages of the budget to alert on when threshold is exceeded for the org audit logs project."
-  type        = list(number)
-  default     = [0.5, 0.75, 0.9, 0.95]
-}
-
-variable "org_audit_logs_project_alert_pubsub_topic" {
-  description = "The name of the Cloud Pub/Sub topic where budget related messages will be published, in the form of `projects/{project_id}/topics/{topic_id}` for the org audit logs project."
-  type        = string
-  default     = null
-}
-
-variable "org_audit_logs_project_budget_amount" {
-  description = "The amount to use as the budget for the org audit logs project."
-  type        = number
-  default     = 1000
-}
-
-variable "scc_notifications_project_alert_spent_percents" {
-  description = "A list of percentages of the budget to alert on when threshold is exceeded for the SCC notifications project."
-  type        = list(number)
-  default     = [0.5, 0.75, 0.9, 0.95]
-}
-
-variable "scc_notifications_project_alert_pubsub_topic" {
-  description = "The name of the Cloud Pub/Sub topic where budget related messages will be published, in the form of `projects/{project_id}/topics/{topic_id}` for the SCC notifications project."
-  type        = string
-  default     = null
-}
-
-variable "scc_notifications_project_budget_amount" {
-  description = "The amount to use as the budget for the SCC notifications project."
-  type        = number
-  default     = 1000
-}
-
-variable "project_prefix" {
-  description = "Name prefix to use for projects created. Should be the same in all steps. Max size is 3 characters."
-  type        = string
-  default     = "prj"
-}
-
-variable "folder_prefix" {
-  description = "Name prefix to use for folders created. Should be the same in all steps."
-  type        = string
-  default     = "fldr"
+  default     = ""
 }

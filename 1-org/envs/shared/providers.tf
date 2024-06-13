@@ -1,5 +1,5 @@
 /**
- * Copyright 2021 Google LLC
+ * Copyright 2024 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,34 +14,13 @@
  * limitations under the License.
  */
 
-locals {
-  tf_sa = var.terraform_service_account
-}
-
-provider "google" {
-  alias = "impersonate"
-
-  scopes = [
-    "https://www.googleapis.com/auth/cloud-platform",
-    "https://www.googleapis.com/auth/userinfo.email",
-  ]
-}
-
-data "google_service_account_access_token" "default" {
-  provider               = google.impersonate
-  target_service_account = local.tf_sa
-  scopes                 = ["userinfo-email", "cloud-platform"]
-  lifetime               = "600s"
-}
-
 /******************************************
-  Provider credential configuration
+  Provider request timeout configuration
  *****************************************/
 provider "google" {
-  access_token = data.google_service_account_access_token.default.access_token
+  request_timeout = "5m"
 }
 
 provider "google-beta" {
-  access_token = data.google_service_account_access_token.default.access_token
+  request_timeout = "5m"
 }
-

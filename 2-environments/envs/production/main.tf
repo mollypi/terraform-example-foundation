@@ -17,14 +17,16 @@
 module "env" {
   source = "../../modules/env_baseline"
 
-  env              = "production"
-  environment_code = "p"
+  env                 = "production"
+  environment_code    = "p"
+  remote_state_bucket = var.remote_state_bucket
+  tfc_org_name        = var.tfc_org_name
 
-  parent_id                  = var.parent_folder != "" ? "folders/${var.parent_folder}" : "organizations/${var.org_id}"
-  org_id                     = var.org_id
-  billing_account            = var.billing_account
-  terraform_service_account  = var.terraform_service_account
-  monitoring_workspace_users = var.monitoring_workspace_users
-  project_prefix             = var.project_prefix
-  folder_prefix              = var.folder_prefix
+  assured_workload_configuration = {
+    enabled           = false
+    location          = "us-central1"
+    display_name      = "FEDRAMP-MODERATE"
+    compliance_regime = "FEDRAMP_MODERATE"
+    resource_type     = "CONSUMER_FOLDER"
+  }
 }

@@ -60,18 +60,12 @@ variable "jenkins_agent_gce_subnetwork_cidr_range" {
 }
 
 variable "jenkins_agent_gce_private_ip_address" {
-  description = "The private IP Address of the Jenkins Agent. This IP Address must be in the CIDR range of `jenkins_agent_gce_subnetwork_cidr_range` and be reachable through the VPN that exists between on-prem (Jenkins Master) and GCP (CICD Project, where the Jenkins Agent is located)."
+  description = "The private IP Address of the Jenkins Agent. This IP Address must be in the CIDR range of `jenkins_agent_gce_subnetwork_cidr_range` and be reachable through the VPN that exists between on-prem (Jenkins Controller) and GCP (CICD Project, where the Jenkins Agent is located)."
   type        = string
-}
-
-variable "jenkins_agent_gce_ssh_user" {
-  description = "Jenkins Agent GCE Instance SSH username."
-  type        = string
-  default     = "jenkins"
 }
 
 variable "jenkins_agent_gce_ssh_pub_key" {
-  description = "SSH public key needed by the Jenkins Agent GCE Instance. The Jenkins Master holds the SSH private key. The correct format is `'ssh-rsa [KEY_VALUE] [USERNAME]'`"
+  description = "SSH public key needed by the Jenkins Agent GCE Instance. The Jenkins Controller holds the SSH private key. The correct format is `'ssh-rsa [KEY_VALUE] [USERNAME]'`"
   type        = string
 }
 
@@ -81,8 +75,8 @@ variable "jenkins_agent_sa_email" {
   default     = "jenkins-agent-gce"
 }
 
-variable "jenkins_master_subnetwork_cidr_range" {
-  description = "A list of CIDR IP ranges of the Jenkins Master in the form ['0.0.0.0/0']. Usually only one IP in the form '0.0.0.0/32'. Needed to create a FW rule that allows communication with the Jenkins Agent GCE Instance."
+variable "jenkins_controller_subnetwork_cidr_range" {
+  description = "A list of CIDR IP ranges of the Jenkins Controller in the form ['0.0.0.0/0']. Usually only one IP in the form '0.0.0.0/32'. Needed to create a FW rule that allows communication with the Jenkins Agent GCE Instance."
   type        = list(string)
 }
 
@@ -97,12 +91,12 @@ variable "vpn_shared_secret" {
 }
 
 variable "on_prem_vpn_public_ip_address" {
-  description = "The public IP Address of the Jenkins Master."
+  description = "The public IP Address of the Jenkins Controller."
   type        = string
 }
 
 variable "on_prem_vpn_public_ip_address2" {
-  description = "The secondpublic IP Address of the Jenkins Master."
+  description = "The secondpublic IP Address of the Jenkins Controller."
   type        = string
 }
 
@@ -141,18 +135,14 @@ variable "tunnel1_bgp_session_range" {
 /* ----------------------------------------
     Specific to Seed Project
    ---------------------------------------- */
-variable "terraform_service_account" {
-  description = "Email for terraform service account. It must be supplied by the seed project"
-  type        = string
-}
 
-variable "terraform_sa_name" {
-  description = "Fully-qualified name of the terraform service account. It must be supplied by the seed project"
-  type        = string
+variable "terraform_sa_names" {
+  description = "Fully-qualified name of the Terraform Service Accounts. It must be supplied by the Seed Project"
+  type        = map(string)
 }
 
 variable "terraform_state_bucket" {
-  description = "Default state bucket, used in Cloud Build substitutions. It must be supplied by the seed project"
+  description = "Default state bucket, used in Cloud Build substitutions. It must be supplied by the Seed Project"
   type        = string
 }
 
@@ -188,6 +178,7 @@ variable "activate_apis" {
     "admin.googleapis.com",
     "appengine.googleapis.com",
     "storage-api.googleapis.com",
+    "dns.googleapis.com",
   ]
 }
 
@@ -224,11 +215,11 @@ variable "folder_id" {
 variable "terraform_version" {
   description = "Default terraform version."
   type        = string
-  default     = "0.13.6"
+  default     = "1.3.10"
 }
 
 variable "terraform_version_sha256sum" {
   description = "sha256sum for default terraform version."
   type        = string
-  default     = "55f2db00b05675026be9c898bdd3e8230ff0c5c78dd12d743ca38032092abfc9"
+  default     = "380ca822883176af928c80e5771d1c0ac9d69b13c6d746e6202482aedde7d457"
 }
